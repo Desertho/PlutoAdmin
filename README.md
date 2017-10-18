@@ -4,4 +4,4 @@
 
 `The development will begin soon.`
 
-                `-- F. Bernkastel`
+                -- F. Bernkastel
