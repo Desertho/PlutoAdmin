@@ -7,7 +7,7 @@ function onPlayerConnecting(args)
 end
 
 function onPlayerConnected(player)
-	Utilities.WriteChatToAll("^5" .. player.name .. " ^7has connected.")
+	WriteChatToAll("^5" .. player.name .. " ^7has connected.")
 	print("[onPlayerConnected]: " .. player.name .. " : " .. tostring(player.steamId) .. " : " .. tostring(player.ip))
 end
 
@@ -28,15 +28,15 @@ end
 function timedMessages()
 	local msgArray = 
 	{ 
-		"^:Welcome to ^1Snek ^:iSnipe Server^0.",
-		"^:Don't break iSnipe Rules.",
+		"^:Welcome to ^1Snek ^:iSnipe Server^0",
+		"^:Check ^1!rules ^:for the server rules",
 		"^:Join our discord: ^1https://discord.gg/SyF9vtF",
 	}
 	
 	math.randomseed(os.time())
 	local printIndex = math.random(1, 3)
 	
-	Utilities.WriteChatToAll(msgArray[printIndex])
+	WriteChatToAll(msgArray[printIndex])
 end
 
 callbacks.playerSay.add(onPlayerSay)

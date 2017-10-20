@@ -1,3 +1,7 @@
+Command = {
+
+}
+
 function ProcessCommand(player, message)
 
   local Args = string.gmatch(string.sub(message,2), "%S+")
@@ -8,11 +12,24 @@ function ProcessCommand(player, message)
   end
 
   if commandname == "ping" then
-    Utilities.WriteChatToPlayer(player, "^1pong, sucker!")
+    WriteChatToPlayer(player, "^1pong, sucker!")
   end
 
   if (commandname == "say") and (#args > 0) then
-    Utilities.WriteChatToAll(args[1])
+    WriteChatToAll(string.sub(message, #commandname + 2))
+  end
+
+  if (commandname == "rules") then
+    WriteChatToPlayerMultiline(player, {
+      "^:Snek iSnipe Rules^0:",
+      "^1Don't ^7HardScope^0.",
+      "^1Don't ^7HalfScope^0.",
+      "^1Don't ^7NoScope^0.",
+      "^1Don't ^7DropShot^0.",
+      "^1Don't ^7Camp^0/^7Wait^0.",
+      "^1Don't ^7HeadGlitch^0.",
+      "^2Respect Admins^0."
+      }, 1000)
   end
 
 end
