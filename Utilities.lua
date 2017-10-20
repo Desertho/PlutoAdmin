@@ -12,7 +12,7 @@ Utilities = {
   end,
 
   RawSayTo = function(player, message)
-    util.playerChatPrint(player, message)
+    player:tell(message)
   end,
   
   WriteChatToAll = function(message)
