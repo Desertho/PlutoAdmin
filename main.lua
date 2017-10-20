@@ -1,9 +1,13 @@
+require("scripts\\mp\\Utilities")
+require("scripts\\mp\\Commands")
+
+
 function onPlayerConnecting(args)
 	print("[onPlayerConnecting]: " .. args.player.name .. " is connecting.")
 end
 
 function onPlayerConnected(player)
-	sayAll("^5" .. player.name .. " ^7has connected.")
+	Utilities.WriteChatToAll("^5" .. player.name .. " ^7has connected.")
 	print("[onPlayerConnected]: " .. player.name .. " : " .. tostring(player.steamId) .. " : " .. tostring(player.ip))
 end
 
@@ -11,21 +15,11 @@ function onPlayerRequestingConnection(args)
 	print("[onPlayerRequestingConnection]: Connection request from IP " .. tostring(args.ip))
 end
 
-function RawSayAll(message)
-  util.chatPrint(message)
-end
-
-function sayAll(message)
-	local consoleName = "^0[^:Snek^0]^7: "
-	util.chatPrint(consoleName .. message)
-end
-
 function onPlayerSay(args)
-  RawSayAll(args.sender.name .. ": " .. args.message)
-  
-  local msg = args.message:lower()
-  if msg == "!ping" then
-    sayAll("^1pong, sucker!")
+  if string.sub(args.message, 1, 1) ~= "!" then
+    Utilities.RawSayAll(args.sender.name .. ": " .. args.message)
+  else
+    ProcessCommand(args.sender, args.message)
   end
   return true  
 end
@@ -42,7 +36,7 @@ function timedMessages()
 	math.randomseed(os.time())
 	local printIndex = math.random(1, 3)
 	
-	sayAll(msgArray[printIndex])
+	Utilities.WriteChatToAll(msgArray[printIndex])
 end
 
 callbacks.playerSay.add(onPlayerSay)
