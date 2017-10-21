@@ -14,7 +14,10 @@ Utilities = {
   RawSayTo = function(player, message)
     player:tell(message)
   end,
-   
+  
+  TrimEnd = function(str)
+    return str:gsub("%s+$", "")
+  end
 }
 
 function WriteChatToAll(message)
@@ -22,6 +25,7 @@ function WriteChatToAll(message)
 end
 
 function WriteChatToPlayer(player, message)
+  if message == nil then message = "" end
   Utilities.RawSayTo(player, ConfigValues.ChatPrefixPM .. " " .. message)
 end
 

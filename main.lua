@@ -1,3 +1,4 @@
+require("scripts\\mp\\Config")
 require("scripts\\mp\\Utilities")
 require("scripts\\mp\\Commands")
 
@@ -19,7 +20,10 @@ function onPlayerSay(args)
   if string.sub(args.message, 1, 1) ~= "!" then
     Utilities.RawSayAll(args.sender.name .. ": " .. args.message)
   else
-    ProcessCommand(args.sender, args.message)
+    xpcall(
+      function() return ProcessCommand(args.sender, args.message) end, 
+      function(E) WriteChatToPlayer(args.sender, E:gsub("Z:\\home\\musta\\Desktop\\Finally\\scripts\\mp\\", "" )) end
+    )
   end
   return true  
 end
