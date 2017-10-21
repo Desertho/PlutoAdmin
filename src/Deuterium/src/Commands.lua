@@ -1,34 +1,76 @@
 Command = {
-  Behavior = {
-    Normal = 1, 
-    HasOptionalArguments = 2,
-    OptionalIsRequired = 4, 
-    MustBeConfirmed = 8
-  },
-  
-  action,
-  parametercount,
-  name,
-  behavior
+
+--[[Flags]]   Behavior = {
+                Normal = 1, 
+                HasOptionalArguments = 2,
+                OptionalIsRequired = 4, 
+                MustBeConfirmed = 8
+              },
+              
+--[[func]]    action,
+--[[int]]     parametercount,
+--[[string]]  name,
+--[[int]]     behavior,
+--[[func]]    Run,
+--[[func]]    GetString = function(name, key)
+                return CmdLang_GetString("command_" .. name .. "_" .. key)
+              end
 }
 
-function Command:new(commandname, paramcount, commandbehaviour, actiontobedone)
-  local o = {}
-  setmetatable(o, self)
+function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
+  local command = {}
   self.__index = self
-  self.action = actiontobedone
-  self.parametercount = paramcount
-  self.name = commandname
-  self.behaviour = commandbehaviour
-  return o
-end  
+  setmetatable(command, self)
+  command.action = actiontobedone
+  command.parametercount = paramcount
+  command.name = commandname
+  command.behavior = commandbehavior
+  
+  command.Run = function(player, message)
+    local parsed, arguments, optionalargument = ParseCommand(message, command.parametercount)
+    if Utilities.HasFlag(Command.Behavior.HasOptionalArguments, command.behavior) then
+      if Utilities.HasFlag(Command.Behavior.OptionalIsRequired, command.behavior) and Utilities.String.IsNullOrWhiteSpace(optionalargument) then
+        WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+        return
+      end
+    elseif not Utilities.String.IsNullOrWhiteSpace(optionalargument) then
+      WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+      return  
+    end
+    if not parsed then
+      WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+    else
+      command.action(player, arguments, optionalargument)
+    end
+  end
+  return command
+end
+
+CommandList = {
+
+  commands = {},
+  
+  Add = function(command)
+    CommandList.commands[#CommandList.commands + 1] = command
+  end,
+  
+  FindCommand = function(commandname)
+    for i, command in pairs(CommandList.commands) do
+      if command.name == commandname then
+        return command
+      end
+    end
+    return nil
+  end
+
+}
 
 -- return bool parsed, string[] arguments, string optionalarguments
 function ParseCommand(CommandToBeParsed, ArgumentAmount)
   local arguments
   local optionalarguments
   local list = {}
-  CommandToBeParsed = Utilities.TrimEnd(CommandToBeParsed)
+  CommandToBeParsed = Utilities.String.TrimEnd(CommandToBeParsed)
   if string.find(CommandToBeParsed, " ", 1, true) == nil then
     return ArgumentAmount == 0, {}, nil
   end
@@ -56,18 +98,17 @@ function ProcessCommand(player, message)
 
   local Args = string.gmatch(string.sub(message,2), "%S+")
   local commandname = Args():lower()
-
-  if commandname == "ping" then
-    WriteChatToPlayer(player, "^1pong, sucker!")
-  end
   
-  local command = Command:new("say", 0, Command.Behavior.HasOptionalArguments, 
-      function(sender, arguments, optarg)
-        WriteChatToAll(optarg)
-      end
+  local CommandToBeRun = CommandList.FindCommand(commandname)
+  if CommandToBeRun ~= nil then
+    xpcall( 
+      function() return CommandToBeRun.Run(player, message) end,
+      function(E) WriteChatToPlayer(args.sender, E) end
     )
-  
-  -- !say
+  else
+    WriteChatToPlayer(player, "not found")
+  end
+  --[[
   if commandname == command.name then 
     local parsed, arguments, optionalarguments = ParseCommand(message, 0)
     if parsed and (optionalarguments ~= nil) then
@@ -76,9 +117,24 @@ function ProcessCommand(player, message)
       WriteChatToPlayer(player, DefaultCmdLang["Message_WrongSyntax"])
     end
   end
+  --]]
 
-  if (commandname == "rules") then
-    WriteChatToPlayerMultiline(player, {
+end
+
+
+CommandList.Add(Command:new("say", 0, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
+  function(sender, arguments, optarg)
+    WriteChatToAll(optarg)
+  end))
+  
+CommandList.Add(Command:new("ping", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    WriteChatToPlayer(sender, "^1pong, sucker!")
+  end))  
+  
+CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    WriteChatToPlayerMultiline(sender, {
       "^:Snek iSnipe Rules^0:",
       "^1Don't ^7HardScope^0.",
       "^1Don't ^7HalfScope^0.",
@@ -87,7 +143,5 @@ function ProcessCommand(player, message)
       "^1Don't ^7Camp^0/^7Wait^0.",
       "^1Don't ^7HeadGlitch^0.",
       "^2Respect Admins^0."
-      }, 1000)
-  end
-
-end
+    }, 1000)
+  end))   

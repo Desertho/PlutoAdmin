@@ -15,8 +15,18 @@ Utilities = {
     player:tell(message)
   end,
   
-  TrimEnd = function(str)
-    return str:gsub("%s+$", "")
+  String = {
+    TrimEnd = function(str)
+      return str:gsub("%s+$", "")
+    end, 
+    
+    IsNullOrWhiteSpace = function(str)
+      return not(str ~= nil and str:match("%S") ~= nil)
+    end
+  },
+  
+  HasFlag = function(flag, flags)
+    return flag & flags ~= 0
   end
 }
 
