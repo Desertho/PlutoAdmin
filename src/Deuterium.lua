@@ -1,6 +1,6 @@
-require("scripts\\mp\\Config")
-require("scripts\\mp\\Utilities")
-require("scripts\\mp\\Commands")
+require("scripts\\mp\\Deuterium.src.Config")
+require("scripts\\mp\\Deuterium.src.Utilities")
+require("scripts\\mp\\Deuterium.src.Commands")
 
 
 function onPlayerConnecting(args)
