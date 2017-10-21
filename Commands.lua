@@ -1,6 +1,27 @@
 Command = {
-
+  Behavior = {
+    Normal = 1, 
+    HasOptionalArguments = 2,
+    OptionalIsRequired = 4, 
+    MustBeConfirmed = 8
+  },
+  
+  action,
+  parametercount,
+  name,
+  behavior
 }
+
+function Command:new(commandname, paramcount, commandbehaviour, actiontobedone)
+  local o = {}
+  setmetatable(o, self)
+  self.__index = self
+  self.action = actiontobedone
+  self.parametercount = paramcount
+  self.name = commandname
+  self.behaviour = commandbehaviour
+  return o
+end  
 
 function ProcessCommand(player, message)
 
