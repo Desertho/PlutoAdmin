@@ -27,6 +27,10 @@ Utilities = {
   
   HasFlag = function(flag, flags)
     return flag & flags ~= 0
+  end,
+  
+  DefaultError = function(E)
+    return  E:gsub("Z:\\home\\musta\\Desktop\\Finally\\scripts\\mp\\", "" )
   end
 }
 

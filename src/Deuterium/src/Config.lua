@@ -1,5 +1,7 @@
 DefaultCmdLang = {
 
+   Message_CommandNotFound = "^1Command not found.",
+
    command_say_usage = "^1Usage: !say <message>",
    
    command_ping_usage = "^1Usage: !ping",

@@ -14,6 +14,10 @@ Command = {
 --[[func]]    Run,
 --[[func]]    GetString = function(name, key)
                 return CmdLang_GetString("command_" .. name .. "_" .. key)
+              end,
+              
+--[[func]]    GetMessage = function(key)
+                return CmdLang_GetString("Message_" .. key)
               end
 }
 
@@ -28,6 +32,12 @@ function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
   
   command.Run = function(player, message)
     local parsed, arguments, optionalargument = ParseCommand(message, command.parametercount)
+    
+    if not parsed then
+      WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+      return
+    end
+    
     if Utilities.HasFlag(Command.Behavior.HasOptionalArguments, command.behavior) then
       if Utilities.HasFlag(Command.Behavior.OptionalIsRequired, command.behavior) and Utilities.String.IsNullOrWhiteSpace(optionalargument) then
         WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
@@ -37,11 +47,12 @@ function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
       WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
       return  
     end
-    if not parsed then
-      WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
-    else
-      command.action(player, arguments, optionalargument)
-    end
+    
+    xpcall( 
+      function() return command.action(player, arguments, optionalargument) end,
+      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) end
+    )
+    
   end
   return command
 end
@@ -103,21 +114,11 @@ function ProcessCommand(player, message)
   if CommandToBeRun ~= nil then
     xpcall( 
       function() return CommandToBeRun.Run(player, message) end,
-      function(E) WriteChatToPlayer(args.sender, E) end
+      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) end
     )
   else
-    WriteChatToPlayer(player, "not found")
+    WriteChatToPlayer(player, Command.GetMessage("CommandNotFound"))
   end
-  --[[
-  if commandname == command.name then 
-    local parsed, arguments, optionalarguments = ParseCommand(message, 0)
-    if parsed and (optionalarguments ~= nil) then
-      command.action(player, arguments, optionalarguments)
-    else
-      WriteChatToPlayer(player, DefaultCmdLang["Message_WrongSyntax"])
-    end
-  end
-  --]]
 
 end
 

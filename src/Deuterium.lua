@@ -22,7 +22,7 @@ function onPlayerSay(args)
   else
     xpcall(
       function() return ProcessCommand(args.sender, args.message) end, 
-      function(E) WriteChatToPlayer(args.sender, E:gsub("Z:\\home\\musta\\Desktop\\Finally\\scripts\\mp\\", "" )) end
+      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) end
     )
   end
   return true  
