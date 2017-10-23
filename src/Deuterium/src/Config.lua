@@ -1,13 +1,17 @@
 DefaultCmdLang = {
 
-   Message_CommandNotFound = "^1Command not found.",
+  Message_CommandNotFound = "^1Command not found.",
 
-   command_say_usage = "^1Usage: !say <message>",
-   
-   command_ping_usage = "^1Usage: !ping",
-   
-   command_rules_usage = "^1Usage: !rules"
+  command_say_usage = "^1Usage: !say <message>",
 
+  command_ping_usage = "^1Usage: !ping",
+
+  command_rules_usage = "^1Usage: !rules"
+
+}
+
+ConfigValues = {
+  ConfigPath = ScriptPath .. "Deuterium\\"
 }
 
 function CmdLang_GetString(key)

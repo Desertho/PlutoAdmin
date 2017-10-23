@@ -32,26 +32,28 @@ function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
   
   command.Run = function(player, message)
     local parsed, arguments, optionalargument = ParseCommand(message, command.parametercount)
-    
+    local execute = false
     if not parsed then
       WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
-      return
+      return false
     end
     
     if Utilities.HasFlag(Command.Behavior.HasOptionalArguments, command.behavior) then
       if Utilities.HasFlag(Command.Behavior.OptionalIsRequired, command.behavior) and Utilities.String.IsNullOrWhiteSpace(optionalargument) then
         WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
-        return
+        return false
       end
     elseif not Utilities.String.IsNullOrWhiteSpace(optionalargument) then
       WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
-      return  
+      return false
     end
     
     xpcall( 
       function() return command.action(player, arguments, optionalargument) end,
       function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) end
     )
+    
+    return true
     
   end
   return command
@@ -112,10 +114,8 @@ function ProcessCommand(player, message)
   
   local CommandToBeRun = CommandList.FindCommand(commandname)
   if CommandToBeRun ~= nil then
-    xpcall( 
-      function() return CommandToBeRun.Run(player, message) end,
-      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) end
-    )
+    local executed = CommandToBeRun.Run(player, message)
+    SLOG.logTo(SLOG.Type.commands, player, {executed = executed, command = commandname, arguments = message:sub(#commandname + 3)})
   else
     WriteChatToPlayer(player, Command.GetMessage("CommandNotFound"))
   end

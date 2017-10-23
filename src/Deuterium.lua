@@ -1,6 +1,9 @@
-require("scripts\\mp\\Deuterium.src.Config")
-require("scripts\\mp\\Deuterium.src.Utilities")
-require("scripts\\mp\\Deuterium.src.Commands")
+ScriptPath = "scripts\\mp\\"
+
+require(ScriptPath .. "Deuterium.src.Config")
+require(ScriptPath .. "Deuterium.src.SQLite")
+require(ScriptPath .. "Deuterium.src.Utilities")
+require(ScriptPath .. "Deuterium.src.Commands")
 
 
 function onPlayerConnecting(args)
@@ -19,6 +22,7 @@ end
 function onPlayerSay(args)
   if string.sub(args.message, 1, 1) ~= "!" then
     Utilities.RawSayAll(args.sender.name .. ": " .. args.message)
+    SLOG.logTo(SLOG.Type.chat, args.sender, {message = args.message})
   else
     xpcall(
       function() return ProcessCommand(args.sender, args.message) end, 
@@ -42,6 +46,9 @@ function timedMessages()
 	
 	WriteChatToAll(msgArray[printIndex])
 end
+
+--
+--db:close()
 
 callbacks.playerSay.add(onPlayerSay)
 callbacks.playerConnecting.add(onPlayerConnecting)
