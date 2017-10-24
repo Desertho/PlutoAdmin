@@ -1,8 +1,10 @@
 ScriptPath = "scripts\\mp\\"
+LibPath = "scripts\\lib\\"
 
 require(ScriptPath .. "Deuterium.src.Config")
 require(ScriptPath .. "Deuterium.src.SQLite")
 require(ScriptPath .. "Deuterium.src.Utilities")
+require(ScriptPath .. "Deuterium.src.Groups")
 require(ScriptPath .. "Deuterium.src.Commands")
 
 

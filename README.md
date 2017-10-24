@@ -8,7 +8,7 @@
 ![](https://raw.githubusercontent.com/FredericaBernkastel/PlutoAdmin/master/doc/deuterium-logo-b.jpg)
 
 #### `Stage: Groups`
-#### `Overrall progress: 2.89% done`
+#### `Overrall progress: 5.09% done`
 
 ```
 SQLite Database......................... done

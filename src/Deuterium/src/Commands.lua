@@ -32,7 +32,7 @@ function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
   
   command.Run = function(player, message)
     local parsed, arguments, optionalargument = ParseCommand(message, command.parametercount)
-    local execute = false
+
     if not parsed then
       WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
       return false
@@ -114,8 +114,19 @@ function ProcessCommand(player, message)
   
   local CommandToBeRun = CommandList.FindCommand(commandname)
   if CommandToBeRun ~= nil then
-    local executed = CommandToBeRun.Run(player, message)
-    SLOG.logTo(SLOG.Type.commands, player, {executed = executed, command = commandname, arguments = message:sub(#commandname + 3)})
+  
+    local group = GroupsDatabase.GetPlayerGroup(player)
+    
+    if not GroupsDatabase.GetEntityPermission(player, group, CommandToBeRun.name) then
+      if group.CanDo(CommandToBeRun.name) then
+        WriteChatToPlayer(player, Command.GetMessage("NotLoggedIn"))
+      else
+        WriteChatToPlayer(player, Command.GetMessage("NoPermission"))
+      end
+    else
+      local executed = CommandToBeRun.Run(player, message)
+      SLOG.logTo(SLOG.Type.commands, player, {executed = executed, command = commandname, arguments = message:sub(#commandname + 3)})
+    end
   else
     WriteChatToPlayer(player, Command.GetMessage("CommandNotFound"))
   end
@@ -145,4 +156,32 @@ CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal,
       "^1Don't ^7HeadGlitch^0.",
       "^2Respect Admins^0."
     }, 1000)
-  end))   
+  end))
+  
+CommandList.Add(Command:new("iamgod", 1, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    if SGRP.db == nil then 
+      print("Error: Groups database not loaded!")
+      return
+    end
+    arguments[1] = arguments[1]:lower()
+    if arguments[1] == "default" then
+      WriteChatToPlayer(sender, Command.GetString("iamgod", "error2"))
+    end
+ 
+    local group = GroupsDatabase.GetGroup(arguments[1])
+    
+    if group == nil then
+      WriteChatToPlayer(sender, Command.GetMessage("GroupNotFound"))
+      return
+    end
+    if SGRP.count() == 0 then
+      SGRP.add(sender, arguments[1], sender)
+      WriteChatToAll(Utilities.gsubMul(Command.GetString("iamgod", "message"), {
+        ["<target>"] = sender.name,
+        ["<rankname>"] = arguments[1],
+      }))
+    else
+      WriteChatToPlayer(sender, Command.GetString("iamgod", "error1"));
+    end
+  end))  
