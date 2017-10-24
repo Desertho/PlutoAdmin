@@ -5,8 +5,12 @@
 
 `An admin script for Pluto MW3.`
 
+![](https://raw.githubusercontent.com/FredericaBernkastel/PlutoAdmin/master/doc/deuterium-logo-b.jpg)
+
 #### `Stage: Groups`
 #### `Overrall progress: 2.89% done`
 
-`SQLite Database......................... done`
-`Command processing...................... done`
+```
+SQLite Database......................... done
+Command processing...................... done
+```
