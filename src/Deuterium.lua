@@ -49,9 +49,6 @@ function timedMessages()
 	WriteChatToAll(msgArray[printIndex])
 end
 
---
---db:close()
-
 callbacks.playerSay.add(onPlayerSay)
 callbacks.playerConnecting.add(onPlayerConnecting)
 callbacks.playerConnected.add(onPlayerConnected)

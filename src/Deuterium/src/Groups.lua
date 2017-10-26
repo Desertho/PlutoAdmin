@@ -42,14 +42,29 @@ GroupsDatabase = {
       LIP.save(ConfigValues.ConfigPath .. "groups.ini", ordered_table.new{
         "default", {
           pass = "",
-          permissions = "ping,rules,iamgod",
+          permissions = "ping,rules,iamgod,version,pm",
           prefix = ""
         },
+        "friend", {
+          pass = "",
+          permissions = "res,map",
+          prefix = "^0[^6Friend^0]^7"
+        },        
         "moderator", {
           pass = "",
-          permissions = "say",
+          permissions = "res,map",
           prefix = "^0[^1M^0]^7"
         },
+        "admin", {
+          pass = "",
+          permissions = "say,res,map",
+          prefix = "^0[^3A^0]^7"
+        }, 
+        "leader", {
+          pass = "",
+          permissions = "say,res,map",
+          prefix = "^0[^:Leader^0]^7"
+        },         
         "owner", {
           pass = "",
           permissions = "*all*",
@@ -88,18 +103,12 @@ GroupsDatabase = {
   end,
   
   FindEntryFromPlayers = function(GUID)
-    local result = nil
     for player in util.iterPlayers() do
       if player:getguid() == GUID then
-        if result == nil then
-          result = player
-        else
-          print("Error: found multiple players with same GUID.")
-          return nil
-        end
+        return player
       end
     end
-    return result
+    return nil
   end
 }
 

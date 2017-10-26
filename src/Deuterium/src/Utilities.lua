@@ -38,13 +38,6 @@ Utilities = {
     return false
   end,
   
-  gsubMul = function(s, t)
-    for k,v in pairs(t) do
-      s = s:gsub(k,v)
-    end
-    return s
-  end,
-  
   DefaultError = function(E)
     return  E:gsub("Z:\\home\\musta\\Desktop\\Finally\\scripts\\mp\\", "" )
   end
@@ -64,6 +57,22 @@ function string:split(delimiter)
   return result
 end
 
+function string:gsubMul(t)
+  for k,v in pairs(t) do
+    self = self:gsub(k,v)
+  end
+  return self
+end
+
+function string:IndexOf(s)
+  return string.find(self, s, 1, true)
+end
+
+function string:Contains(s)
+  if s == nil then return false end
+  return string.IndexOf(self, s) ~= nil
+end
+
 function WriteChatToAll(message)
   Utilities.RawSayAll(ConfigValues.ChatPrefix .. " " .. message)
 end
@@ -81,4 +90,46 @@ function WriteChatToPlayerMultiline(player, messages, delay)
       function() WriteChatToPlayer(player, message) end
     )
   end
+end
+
+function ChangeMap(devmapname)
+  util.executeCommand("map " .. devmapname)
+end
+
+function FindPlayers(identifier)
+  local result = {}
+  identifier = identifier:lower()
+  for player in util.iterPlayers() do
+    if player.name:lower():Contains(identifier) then
+      result[#result + 1] = player
+    end
+  end
+  return result
+end
+
+function FindSinglePlayer(identifier)
+  local players = FindPlayers(identifier)
+  if #players ~= 1 then
+    return nil
+  end
+  return players[1]
+end
+
+function FindMaps(identifier)
+  local result = {}
+  identifier = identifier:lower()
+  for mapname, devmapname in pairs(Data.StandardMapNames) do
+    if mapname:Contains(identifier) or devmapname:Contains(identifier) then
+      result[#result + 1] = devmapname
+    end
+  end
+  return result
+end
+
+function FindSingleMap(identifier)
+  local maps = FindMaps(identifier)
+  if #maps ~= 1 then
+    return nil
+  end
+  return maps[1]
 end

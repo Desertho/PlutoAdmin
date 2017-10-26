@@ -48,12 +48,12 @@ function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
       return false
     end
     
-    xpcall( 
+    local status, executed = xpcall(
       function() return command.action(player, arguments, optionalargument) end,
-      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) end
+      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) return true end
     )
     
-    return true
+    return (executed == nil) and true or executed
     
   end
   return command
@@ -84,24 +84,24 @@ function ParseCommand(CommandToBeParsed, ArgumentAmount)
   local optionalarguments
   local list = {}
   CommandToBeParsed = Utilities.String.TrimEnd(CommandToBeParsed)
-  if string.find(CommandToBeParsed, " ", 1, true) == nil then
+  if not CommandToBeParsed:Contains(" ") then
     return ArgumentAmount == 0, {}, nil
   end
   
-  CommandToBeParsed = string.sub(CommandToBeParsed, string.find(CommandToBeParsed, " ", 1, true) + 1)
+  CommandToBeParsed = string.sub(CommandToBeParsed, CommandToBeParsed:IndexOf(" ") + 1)
   while #list < ArgumentAmount do
 
     if CommandToBeParsed == nil then
         return false, {}, nil
     end
     
-    local length = string.find(CommandToBeParsed, " ", 1, true)
+    local length = CommandToBeParsed:IndexOf(" ")
     if length == nil then
       list[#list + 1] = CommandToBeParsed
       CommandToBeParsed = nil
     else
       list[#list + 1] = string.sub(CommandToBeParsed, 1, length - 1)
-      CommandToBeParsed = string.sub(CommandToBeParsed, string.find(CommandToBeParsed, " ", 1, true) + 1)
+      CommandToBeParsed = string.sub(CommandToBeParsed, CommandToBeParsed:IndexOf(" ") + 1)
     end
   end
   return true, list, CommandToBeParsed
@@ -133,17 +133,21 @@ function ProcessCommand(player, message)
 
 end
 
-
+-- say <message>
 CommandList.Add(Command:new("say", 0, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
   function(sender, arguments, optarg)
     WriteChatToAll(optarg)
-  end))
-  
+  end
+))
+
+-- ping
 CommandList.Add(Command:new("ping", 0, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
     WriteChatToPlayer(sender, "^1pong, sucker!")
-  end))  
-  
+  end
+))  
+
+-- rules
 CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
     WriteChatToPlayerMultiline(sender, {
@@ -156,13 +160,15 @@ CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal,
       "^1Don't ^7HeadGlitch^0.",
       "^2Respect Admins^0."
     }, 1000)
-  end))
-  
+  end
+))
+
+-- iamgod <group>
 CommandList.Add(Command:new("iamgod", 1, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
     if SGRP.db == nil then 
       print("Error: Groups database not loaded!")
-      return
+      return false
     end
     arguments[1] = arguments[1]:lower()
     if arguments[1] == "default" then
@@ -173,15 +179,73 @@ CommandList.Add(Command:new("iamgod", 1, Command.Behavior.Normal,
     
     if group == nil then
       WriteChatToPlayer(sender, Command.GetMessage("GroupNotFound"))
-      return
+      return false
     end
-    if SGRP.count() == 0 then
-      SGRP.add(sender, arguments[1], sender)
-      WriteChatToAll(Utilities.gsubMul(Command.GetString("iamgod", "message"), {
+    if SGRP.Count() == 0 then
+      SGRP.SetGroup(sender, arguments[1], sender)
+      WriteChatToAll(Command.GetString("iamgod", "message"):gsubMul{
         ["<target>"] = sender.name,
         ["<rankname>"] = arguments[1],
-      }))
+      })
     else
       WriteChatToPlayer(sender, Command.GetString("iamgod", "error1"));
     end
-  end))  
+  end
+))  
+
+-- res  
+CommandList.Add(Command:new("res", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    WriteChatToAll(Command.GetString("res", "message"):gsubMul{
+      ["<player>"] = sender.name
+    })
+    gsc.map_restart()
+  end
+))
+
+-- version
+CommandList.Add(Command:new("version", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    WriteChatToPlayer(sender, "^3Deuterium ^1" .. ConfigValues.Version .. "^3.")
+  end))
+
+-- pm
+CommandList.Add(Command:new("pm", 1, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      WriteChatToPlayer(sender, Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    WriteChatToPlayer(sender, Command.GetString("pm", "send"):gsubMul{
+      ["<recipient>"] = target.name,
+      ["<message>"] = optarg
+    })
+    
+    callbacks.afterDelay.add(100, function()
+        WriteChatToPlayer(target, Command.GetString("pm", "receive"):gsubMul{
+          ["<sender>"] = sender.name,
+          ["<message>"] = optarg
+        })
+      end)
+  end
+))
+
+-- map
+CommandList.Add(Command:new("map", 1, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local map = FindSingleMap(arguments[1])
+    if map == nil then
+      WriteChatToPlayer(sender, Command.GetMessage("NotOneMapFound"))
+      return false
+    end
+    
+    WriteChatToAll(Command.GetString("map", "message"):gsubMul{
+      ["<player>"] = sender.name,
+      ["<mapname>"] = map
+    })
+    
+    ChangeMap(map)
+  end
+))

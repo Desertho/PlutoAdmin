@@ -15,6 +15,17 @@ function switch(t)
   return t
 end
 
+local sqlutil = { 
+  runner = function(db, args, statements)
+    for i, statement in pairs (statements) do
+      local stmt = db:prepare(statement)
+      stmt:bind_names(args)
+      stmt:step()
+      stmt:finalize()
+    end
+  end
+}
+
 SLOG = {
 
   Type = {
@@ -94,7 +105,7 @@ SGRP = {
         CREATE TABLE IF NOT EXISTS `groups` (
           `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
           `playername` VARCHAR (255), 
-          `guid` BIGINT, 
+          `guid` BIGINT UNIQUE, 
           `group` VARCHAR (255), 
           `set_by` VARCHAR (255)
         );       
@@ -102,15 +113,26 @@ SGRP = {
     end
   end,
   
-  add = function(player, group, issuer)
+  SetGroup = function(player, group, issuer)
     if SGRP.db == nil then return end 
     
-    local stmt = SGRP.db:prepare([[
-      INSERT OR IGNORE INTO `groups` (`playername`,`guid`,`group`,`set_by`) VALUES (?,?,?,?)
-    ]])
-    stmt:bind_values(player.name, player:getguid(), group, issuer.name)
-    stmt:step()
-    stmt:finalize()
+    sqlutil.runner(SGRP.db, {
+        playername = player.name, 
+        guid = player:getguid(), 
+        group = group, 
+        set_by = issuer.name
+      },
+      {[[
+          /* update if exists */
+          UPDATE `groups` SET `group` = :group WHERE `guid` = :guid;
+       ]],[[
+          /* guid is unique */
+          INSERT OR IGNORE INTO `groups` 
+          ( `playername`,  `guid`,  `group`,  `set_by`) VALUES 
+          (:playername, :guid, :group, :set_by);
+       ]]
+      }
+    )
   end,
   
   GetGroup = function(player)
@@ -129,7 +151,7 @@ SGRP = {
     return result
   end,
   
-  count = function()
+  Count = function()
     if SGRP.db == nil then return end
     local result = nil
     local sql=[=[
