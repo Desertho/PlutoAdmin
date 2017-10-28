@@ -9,13 +9,13 @@ Utilities = {
   end,
   
   String = {
-    TrimEnd = function(str)
-      return str:gsub("%s+$", "")
-    end, 
-    
     IsNullOrWhiteSpace = function(str)
       return not(str ~= nil and str:match("%S") ~= nil)
-    end
+    end,
+    
+    IsNullOrEmpty = function(str)
+      return not(str ~= nil and str ~= "")
+    end,    
   },
   
   IO = {
@@ -25,26 +25,31 @@ Utilities = {
     end
   },
   
-  HasFlag = function(flag, flags)
-    return flag & flags ~= 0
-  end,
-  
-  HasValue = function(tab, val)
-    for index, value in ipairs(tab) do
-        if value == val then
-            return true
-        end
+  ParseBool = function(message)
+    message = message:lower():Trim();
+    if message == "y" or message == "ye" or message == "yes" or message == "on" or message == "true" or message == "1" then
+      return true
     end
     return false
   end,
-  
+
   DefaultError = function(E)
-    return  E:gsub("Z:\\home\\musta\\Desktop\\Finally\\scripts\\mp\\", "" )
+    return  E:gsub("%.%.%..-scripts", "" )
   end
 }
 
+function AfterDelay(delay, func)
+  assert(type(func) == "function", "Not a function \n" .. debug.traceback())
+  callbacks.onInterval.add(delay, func)
+end
+
+function string:Literalize()
+    return self:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%0")
+end
+
 -- split a string
-function string:split(delimiter)
+function string:Split(delimiter)
+  delimiter = delimiter:Literalize()
   local result = { }
   local from  = 1
   local delim_from, delim_to = string.find( self, delimiter, from  )
@@ -68,28 +73,90 @@ function string:IndexOf(s)
   return string.find(self, s, 1, true)
 end
 
+function string:TrimEnd()
+  return self:gsub("%s+$", "")
+end 
+
+function string:Trim()
+  return self:match "^%s*(.-)%s*$"
+end
+
 function string:Contains(s)
   if s == nil then return false end
   return string.IndexOf(self, s) ~= nil
 end
 
+function string:RemoveColors()
+  for k,v in pairs(Data.Colors) do
+    self = self:gsub(k:Literalize(),"")
+  end
+  return self
+end
+
+function table.HasValue(self, value)
+  for i, v in ipairs(self) do
+    if value == v then
+      return true
+    end
+  end
+  return false
+end
+
+function table.FromIterator(...)
+  local arr = {}
+  for v in ... do
+    arr[#arr + 1] = v
+  end
+  return arr
+end
+
+function table.Condense(self, condenselevel, separator)
+  if condenselevel == nil then condenselevel = 40 end
+  if separator == nil then separator = ", " end
+  
+  if #self < 1 then
+    return self
+  end
+  local _lines = {}
+  local index = 1
+  local line = self[index]
+  index = index + 1
+  while index < #self do
+    if ((line .. separator .. self[index]):RemoveColors():len() > condenselevel) then
+      _lines[#_lines + 1] = line
+      line = self[index]
+    else
+      line = line .. separator .. self[index]
+    end
+    index = index + 1
+  end
+  _lines[#_lines + 1] = line
+  
+  return _lines
+end
+
 function WriteChatToAll(message)
-  Utilities.RawSayAll(ConfigValues.ChatPrefix .. " " .. message)
+  Utilities.RawSayAll(Lang_GetString("ChatPrefix") .. " " .. message)
 end
 
-function WriteChatToPlayer(player, message)
-  if message == nil then message = "" end
-  Utilities.RawSayTo(player, ConfigValues.ChatPrefixPM .. " " .. message)
+function Player:WriteChat(message)
+  if message == nil then return end
+  Utilities.RawSayTo(self, Lang_GetString("ChatPrefixPM") .. " " .. message)
 end
 
-function WriteChatToPlayerMultiline(player, messages, delay)
+function Player:WriteChatMultiline(messages, delay)
   if delay == nil then delay = 500 end
 
   for i, message in ipairs(messages) do
     callbacks.afterDelay.add((i - 1) * delay, 
-      function() WriteChatToPlayer(player, message) end
+      function() self:WriteChat(message) end
     )
   end
+end
+
+function Player:WriteChatCondensed(messages, delay, condenselevel, separator)
+  if delay == nil then delay = 1000 end
+  self:WriteChatMultiline(table.Condense(messages, condenselevel, separator), delay)
 end
 
 function ChangeMap(devmapname)
@@ -97,14 +164,26 @@ function ChangeMap(devmapname)
 end
 
 function FindPlayers(identifier)
-  local result = {}
-  identifier = identifier:lower()
-  for player in util.iterPlayers() do
-    if player.name:lower():Contains(identifier) then
-      result[#result + 1] = player
+  if identifier:sub(1,1) == '#'  then
+    local entref = tonumber(identifier:sub(2, #identifier))
+      if entref >= 0 and entref < 18 then
+        for player in util.iterPlayers() do
+          if player:getentitynumber() == entref then
+            return { player }
+          end
+        end
+      end
+    return {}
+  else
+    local result = {}
+    identifier = identifier:lower()
+    for player in util.iterPlayers() do
+      if player.name:lower():Contains(identifier) then
+        result[#result + 1] = player
+      end
     end
+    return result
   end
-  return result
 end
 
 function FindSinglePlayer(identifier)
@@ -132,4 +211,19 @@ function FindSingleMap(identifier)
     return nil
   end
   return maps[1]
+end
+
+-- Simple timed messages function
+function timedMessages()
+	local msgArray = 
+	{ 
+		"^:Welcome to ^1Snek ^:iSnipe Server^0",
+		"^:Check ^1!rules ^:for the server rules",
+		"^:Join our discord: ^1https://discord.gg/SyF9vtF",
+	}
+	
+	math.randomseed(os.time())
+	local printIndex = math.random(1, 3)
+	
+	WriteChatToAll(msgArray[printIndex])
 end

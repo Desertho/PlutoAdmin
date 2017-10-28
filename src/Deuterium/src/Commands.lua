@@ -28,29 +28,38 @@ function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
   command.action = actiontobedone
   command.parametercount = paramcount
   command.name = commandname
-  command.behavior = commandbehavior
+  command.behavior = {
+    value = commandbehavior,
+    HasFlag = function(flag)
+      return flag & command.behavior.value ~= 0
+    end
+  }
   
   command.Run = function(player, message)
     local parsed, arguments, optionalargument = ParseCommand(message, command.parametercount)
 
     if not parsed then
-      WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+      player:WriteChat(Command.GetString(command.name, "usage"))
       return false
     end
     
-    if Utilities.HasFlag(Command.Behavior.HasOptionalArguments, command.behavior) then
-      if Utilities.HasFlag(Command.Behavior.OptionalIsRequired, command.behavior) and Utilities.String.IsNullOrWhiteSpace(optionalargument) then
-        WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+    if command.behavior.HasFlag(Command.Behavior.HasOptionalArguments) then
+      if command.behavior.HasFlag(Command.Behavior.OptionalIsRequired) and Utilities.String.IsNullOrWhiteSpace(optionalargument) then
+        player:WriteChat(Command.GetString(command.name, "usage"))
         return false
       end
     elseif not Utilities.String.IsNullOrWhiteSpace(optionalargument) then
-      WriteChatToPlayer(player, Command.GetString(command.name, "usage"))
+      player:WriteChat(Command.GetString(command.name, "usage"))
       return false
     end
     
     local status, executed = xpcall(
       function() return command.action(player, arguments, optionalargument) end,
-      function(E) WriteChatToPlayer(args.sender, Utilities.DefaultError(E)) return true end
+      function(E)
+        local e = Utilities.DefaultError(E) 
+        print(e)
+        WriteChatToAll(e)
+      return true end
     )
     
     return (executed == nil) and true or executed
@@ -83,7 +92,7 @@ function ParseCommand(CommandToBeParsed, ArgumentAmount)
   local arguments
   local optionalarguments
   local list = {}
-  CommandToBeParsed = Utilities.String.TrimEnd(CommandToBeParsed)
+  CommandToBeParsed = CommandToBeParsed:TrimEnd()
   if not CommandToBeParsed:Contains(" ") then
     return ArgumentAmount == 0, {}, nil
   end
@@ -119,16 +128,16 @@ function ProcessCommand(player, message)
     
     if not GroupsDatabase.GetEntityPermission(player, group, CommandToBeRun.name) then
       if group.CanDo(CommandToBeRun.name) then
-        WriteChatToPlayer(player, Command.GetMessage("NotLoggedIn"))
+        player:WriteChat(Command.GetMessage("NotLoggedIn"))
       else
-        WriteChatToPlayer(player, Command.GetMessage("NoPermission"))
+        player:WriteChat(Command.GetMessage("NoPermission"))
       end
     else
       local executed = CommandToBeRun.Run(player, message)
       SLOG.logTo(SLOG.Type.commands, player, {executed = executed, command = commandname, arguments = message:sub(#commandname + 3)})
     end
   else
-    WriteChatToPlayer(player, Command.GetMessage("CommandNotFound"))
+    player:WriteChat(Command.GetMessage("CommandNotFound"))
   end
 
 end
@@ -136,21 +145,21 @@ end
 -- say <message>
 CommandList.Add(Command:new("say", 0, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
   function(sender, arguments, optarg)
-    WriteChatToAll(optarg)
+    WriteChatToAll(optarg:RemoveColors())
   end
 ))
 
 -- ping
 CommandList.Add(Command:new("ping", 0, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
-    WriteChatToPlayer(sender, "^1pong, sucker!")
+    sender:WriteChat("^1pong, sucker!")
   end
 ))  
 
 -- rules
 CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
-    WriteChatToPlayerMultiline(sender, {
+    sender:WriteChatMultiline({
       "^:Snek iSnipe Rules^0:",
       "^1Don't ^7HardScope^0.",
       "^1Don't ^7HalfScope^0.",
@@ -166,29 +175,27 @@ CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal,
 -- iamgod <group>
 CommandList.Add(Command:new("iamgod", 1, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
-    if SGRP.db == nil then 
-      print("Error: Groups database not loaded!")
-      return false
-    end
+    assert(SMAN.db ~= nil, "Error: Groups database not loaded! \n" .. debug.traceback())
+
     arguments[1] = arguments[1]:lower()
     if arguments[1] == "default" then
-      WriteChatToPlayer(sender, Command.GetString("iamgod", "error2"))
+      sender:WriteChat(Command.GetString("iamgod", "error2"))
     end
  
     local group = GroupsDatabase.GetGroup(arguments[1])
     
     if group == nil then
-      WriteChatToPlayer(sender, Command.GetMessage("GroupNotFound"))
+      sender:WriteChat(Command.GetMessage("GroupNotFound"))
       return false
     end
     if SGRP.Count() == 0 then
-      SGRP.SetGroup(sender, arguments[1], sender)
+      sender:SetGroup(group.group_name, sender)
       WriteChatToAll(Command.GetString("iamgod", "message"):gsubMul{
         ["<target>"] = sender.name,
-        ["<rankname>"] = arguments[1],
+        ["<rankname>"] = group.group_name,
       })
     else
-      WriteChatToPlayer(sender, Command.GetString("iamgod", "error1"));
+      sender:WriteChat(Command.GetString("iamgod", "error1"))
     end
   end
 ))  
@@ -199,32 +206,33 @@ CommandList.Add(Command:new("res", 0, Command.Behavior.Normal,
     WriteChatToAll(Command.GetString("res", "message"):gsubMul{
       ["<player>"] = sender.name
     })
-    gsc.map_restart()
+    util.executeCommand("fast_restart")
   end
 ))
 
 -- version
 CommandList.Add(Command:new("version", 0, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
-    WriteChatToPlayer(sender, "^3Deuterium ^1" .. ConfigValues.Version .. "^3.")
-  end))
+    sender:WriteChat("^3Deuterium ^1" .. ConfigValues.Version .. "^3.")
+  end
+))
 
--- pm
+-- pm <player> <message>
 CommandList.Add(Command:new("pm", 1, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
   function(sender, arguments, optarg)
     local target = FindSinglePlayer(arguments[1])
     if target == nil then
-      WriteChatToPlayer(sender, Command.GetMessage("NotOnePlayerFound"))
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
       return false
     end
     
-    WriteChatToPlayer(sender, Command.GetString("pm", "send"):gsubMul{
+    sender:WriteChat(Command.GetString("pm", "send"):gsubMul{
       ["<recipient>"] = target.name,
       ["<message>"] = optarg
     })
     
     callbacks.afterDelay.add(100, function()
-        WriteChatToPlayer(target, Command.GetString("pm", "receive"):gsubMul{
+        target:WriteChat(Command.GetString("pm", "receive"):gsubMul{
           ["<sender>"] = sender.name,
           ["<message>"] = optarg
         })
@@ -232,12 +240,12 @@ CommandList.Add(Command:new("pm", 1, Command.Behavior.HasOptionalArguments | Com
   end
 ))
 
--- map
+-- map <mapname>
 CommandList.Add(Command:new("map", 1, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
     local map = FindSingleMap(arguments[1])
     if map == nil then
-      WriteChatToPlayer(sender, Command.GetMessage("NotOneMapFound"))
+      sender:WriteChat(Command.GetMessage("NotOneMapFound"))
       return false
     end
     
@@ -249,3 +257,210 @@ CommandList.Add(Command:new("map", 1, Command.Behavior.Normal,
     ChangeMap(map)
   end
 ))
+
+-- admins
+CommandList.Add(Command:new("admins", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    sender:WriteChat(Command.GetString("admins", "firstline"))
+    sender:WriteChatCondensed(GroupsDatabase.GetAdminsString(table.FromIterator(util.iterPlayers())), 1000, 40, Command.GetString("admins", "separator"))
+  end
+))
+
+-- status [players]
+CommandList.Add(Command:new("status", 0, Command.Behavior.HasOptionalArguments, 
+  function(sender, arguments, optarg)
+    local statusstrings = {}
+    local Players = {}
+    
+    if Utilities.String.IsNullOrEmpty(optarg) then
+      Players = table.FromIterator(util.iterPlayers())
+    else
+      Players = FindPlayers(optarg)
+    end
+    for i, player in ipairs(Players) do
+      statusstrings[#statusstrings + 1] = Command.GetString("status", "formatting"):gsubMul{
+        ["<namef>"] = player:GetFormattedName(),
+        ["<name>"] = player.name,
+        ["<rankname>"] = player:GetGroup(database).group_name,
+        ["<shortrank>"] = player:GetGroup(database).prefix,
+        ["<id>"] = tostring(sender:getentitynumber())
+      }
+    end
+    sender:WriteChat(Command.GetString("status", "firstline"))
+    sender:WriteChatMultiline(statusstrings)
+  end
+))
+
+-- kick <player> [reason]
+CommandList.Add(Command:new("kick", 1, Command.Behavior.HasOptionalArguments, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+
+    WriteChatToAll(Command.GetString("kick", "message"):gsubMul{
+      ["<target>"] = target.name,
+      ["<targetf>"] = target:GetFormattedName(),
+      ["<issuer>"] = sender.name,
+      ["<issuerf>"] = sender:GetFormattedName(),
+      ["<reason>"] = (optarg == nil) and "" or optarg
+    })
+
+    CMD_kick(target, optarg)
+  end
+))
+
+-- warn <player> [reason]
+CommandList.Add(Command:new("warn", 1, Command.Behavior.HasOptionalArguments, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    local warns = SMAN.CMD_WARN_GET(target)
+    
+    WriteChatToAll(Command.GetString("warn", "message"):gsubMul{
+      ["<target>"] = target.name,
+      ["<targetf>"] = target:GetFormattedName(),
+      ["<issuer>"] = sender.name,
+      ["<issuerf>"] = sender:GetFormattedName(),
+      ["<reason>"] = (optarg == nil) and "" or optarg,
+      ["<warncount>"] = tostring(warns + 1),
+      ["<maxwarns>"] = tostring(Settings.Get("commands.maxwarns"))      
+    })
+    
+    target:iPrintLnBold(Command.GetMessage("YouHaveBeenWarned"))
+    
+    if warns == Settings.Get("commands.maxwarns") - 1 then
+      SMAN.CMD_WARN_SET(target, 0)
+      CMD_kick(target, optarg)
+    else
+      SMAN.CMD_WARN_SET(target, warns + 1)
+    end
+  end
+))
+
+-- unwarn <player> [reason]
+CommandList.Add(Command:new("unwarn", 1, Command.Behavior.HasOptionalArguments, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    local warns = SMAN.CMD_WARN_GET(target)
+    
+    if warns == 0 then
+      sender:WriteChat(Command.GetString("warns", "message"):gsubMul{
+        ["<target>"] = target.name,
+        ["<targetf>"] = target:GetFormattedName(),
+        ["<warncount>"] = tostring(warns),
+        ["<maxwarns>"] = tostring(Settings.Get("commands.maxwarns"))
+      })
+    else
+      WriteChatToAll(Command.GetString("unwarn", "message"):gsubMul{
+        ["<target>"] = target.name,
+        ["<targetf>"] = target:GetFormattedName(),
+        ["<issuer>"] = sender.name,
+        ["<issuerf>"] = sender:GetFormattedName(),
+        ["<reason>"] = (optarg == nil) and "" or optarg,
+        ["<warncount>"] = tostring(warns - 1),
+        ["<maxwarns>"] = tostring(Settings.Get("commands.maxwarns"))      
+      })
+      
+      target:iPrintLnBold(Command.GetMessage("YouHaveBeenUnwarned"))
+      
+      SMAN.CMD_WARN_SET(target, warns - 1)
+    end
+  end
+))
+
+-- warns <player> [reset]
+CommandList.Add(Command:new("warns", 1, Command.Behavior.HasOptionalArguments, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    local warns = SMAN.CMD_WARN_GET(target)
+    
+    if Utilities.String.IsNullOrWhiteSpace(optarg) then
+      sender:WriteChat(Command.GetString("warns", "message"):gsubMul{
+        ["<target>"] = target.name,
+        ["<targetf>"] = target:GetFormattedName(),
+        ["<warncount>"] = tostring(warns),
+        ["<maxwarns>"] = tostring(Settings.Get("commands.maxwarns"))
+      })
+    else
+      local reset = Utilities.ParseBool(optarg)
+      if not reset then
+        sender:WriteChat(Command.GetString("warns", "usage"))
+        return false
+      end
+      
+      if warns == 0 then
+        sender:WriteChat(Command.GetString("warns", "message"):gsubMul{
+          ["<target>"] = target.name,
+          ["<targetf>"] = target:GetFormattedName(),
+          ["<warncount>"] = tostring(warns),
+          ["<maxwarns>"] = tostring(Settings.Get("commands.maxwarns"))
+        })
+        return false
+      end
+      
+      SMAN.CMD_WARN_SET(target, 0)
+      WriteChatToAll(Command.GetString("warns", "reset"):gsubMul{
+        ["<target>"] = target.name,
+        ["<targetf>"] = target:GetFormattedName(),
+        ["<issuer>"] = sender.name,
+        ["<issuerf>"] = sender:GetFormattedName()
+      })
+    end
+  end
+))
+
+-- setgroup <player> <groupname/default>
+CommandList.Add(Command:new("setgroup", 2, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    assert(SMAN.db ~= nil, "Error: Groups database not loaded! \n" .. debug.traceback())
+    
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+
+    arguments[2] = arguments[2]:lower()
+ 
+    local group = GroupsDatabase.GetGroup(arguments[2])
+    
+    if group == nil then
+      sender:WriteChat(Command.GetMessage("GroupNotFound"))
+      return false
+    end
+    
+    sender:SetGroup(group.group_name, sender)
+    
+    WriteChatToAll(Command.GetString("setgroup", "message"):gsubMul{
+      ["<target>"] = target.name,
+      ["<targetf>"] = target:GetFormattedName(),
+      ["<issuer>"] = sender.name,
+      ["<issuerf>"] = sender:GetFormattedName(),
+      ["<rankname>"] = group.group_name,
+    })
+  end
+))
+
+function CMD_kick(target, reason)
+  if Utilities.String.IsNullOrEmpty(reason) then reason = "You have been kicked" end
+  AfterDelay(200, function() 
+    util.executeCommand("dropclient " .. target:getentitynumber() .. " \"" .. reason .. "\"")
+  end)
+end

@@ -1,5 +1,4 @@
-local sqlite3 = require("lsqlite3")
-inspect = require("inspect")
+assert(sqlite3 ~= nil, "Error: Unable to load lsqlite3 dynamic library \n" .. debug.traceback())
 
 function switch(t)
   t.case = function (self,x)
@@ -40,30 +39,26 @@ SLOG = {
   db = nil,
 
   init = function()
-  
-    if sqlite3 == nil then
-      print("Error: Unable to load lsqlite3 dynamic library")
-    else
-      SLOG.db = sqlite3.open(ConfigValues.ConfigPath .. "logs.db")
-      SLOG.db:exec([=[
-        CREATE TABLE IF NOT EXISTS chat (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, 
-          time VARCHAR (32), 
-          playername VARCHAR (255), 
-          guid BIGINT, 
-          message TEXT
-        );
-        CREATE TABLE IF NOT EXISTS commands (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, 
-          time VARCHAR (32), 
-          playername VARCHAR (255), 
-          guid BIGINT,
-          executed BOOLEAN,
-          command VARCHAR (255),
-          arguments TEXT
-        );        
-      ]=])
-    end
+
+    SLOG.db = sqlite3.open(ConfigValues.ConfigPath .. "logs.db")
+    SLOG.db:exec([=[
+      CREATE TABLE IF NOT EXISTS chat (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        time VARCHAR (32), 
+        playername VARCHAR (255), 
+        guid BIGINT, 
+        message TEXT
+      );
+      CREATE TABLE IF NOT EXISTS commands (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        time VARCHAR (32), 
+        playername VARCHAR (255), 
+        guid BIGINT,
+        executed BOOLEAN,
+        command VARCHAR (255),
+        arguments TEXT
+      );        
+    ]=])
   end,
   
   logTo = function(logType, player, data)
@@ -93,58 +88,124 @@ SLOG = {
 
 }
 
-SGRP = {
+SMAN = {
   db = nil,
   
   init = function()
-    if sqlite3 == nil then
-      print("Error: Unable to load lsqlite3 dynamic library")
+    
+    SMAN.db = sqlite3.open(ConfigValues.ConfigPath .. "main.db")
+    SMAN.db:exec([=[
+      CREATE TABLE IF NOT EXISTS `groups` (
+        `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
+        `playername` VARCHAR (255), 
+        `guid` BIGINT UNIQUE, 
+        `group` VARCHAR (255), 
+        `set_by` VARCHAR (255)
+      );
+      CREATE TABLE IF NOT EXISTS `cmd_warn` (
+        `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
+        `playername` VARCHAR (255), 
+        `guid` BIGINT UNIQUE, 
+        `warns` INTEGER
+      );      
+    ]=])
+  end,
+  
+  CMD_WARN_GET = function(player)
+    local result = nil
+    local stmt = SMAN.db:prepare([=[
+      SELECT `warns` FROM `cmd_warn` WHERE `guid` = ?
+    ]=])
+    stmt:bind(1, player:getguid())
+    if stmt:step() == 100 then
+      result = stmt:get_values()[1]
+    end
+    stmt:finalize()
+    
+    return (tonumber(result) == nil) and 0 or tonumber(result)
+  end,
+  
+  CMD_WARN_SET = function(player, warns)
+    if warns == 0 then
+      sqlutil.runner(SMAN.db, {
+          guid = player:getguid()
+        },
+        {[[
+            DELETE FROM `cmd_warn` WHERE `guid` = :guid;
+         ]]
+        }
+      )
     else
-      SGRP.db = sqlite3.open(ConfigValues.ConfigPath .. "main.db")
-      SGRP.db:exec([=[
-        CREATE TABLE IF NOT EXISTS `groups` (
-          `id` INTEGER PRIMARY KEY AUTOINCREMENT, 
-          `playername` VARCHAR (255), 
-          `guid` BIGINT UNIQUE, 
-          `group` VARCHAR (255), 
-          `set_by` VARCHAR (255)
-        );       
-      ]=])      
+      sqlutil.runner(SMAN.db, {
+          playername = player.name, 
+          guid = player:getguid(), 
+          warns = warns, 
+        },
+        {[[
+            /* update if exists */
+            UPDATE `cmd_warn` SET `warns` = :warns WHERE `guid` = :guid;
+         ]],[[
+            /* coalesce by guid */
+            INSERT OR IGNORE INTO `cmd_warn` 
+            ( `playername`,  `guid`,  `warns`) VALUES 
+            ( :playername,   :guid,   :warns);
+         ]]
+        }
+      )
+    end
+  end
+}
+
+SGRP = {
+
+  SetGroup = function(player, group, issuer)
+    if group == "default" then
+      sqlutil.runner(SMAN.db, {
+          guid = player:getguid()
+        },
+        {[[
+          DELETE FROM `groups` WHERE `guid` = :guid;
+        ]]}
+      )
+    else
+      sqlutil.runner(SMAN.db, {
+          playername = player.name, 
+          guid = player:getguid(), 
+          group = group, 
+          set_by = issuer.name
+        },
+        {[[
+            /* update if exists */
+            UPDATE `groups` SET 
+              `group` = :group, 
+              `set_by` = 
+                CASE WHEN 
+                  :playername = :set_by
+                THEN
+                  (SELECT set_by FROM `groups` WHERE `guid` = :guid)
+                ELSE
+                  :set_by
+                END
+            WHERE `guid` = :guid;
+         ]],[[
+            /* coalesce by guid */
+            INSERT OR IGNORE INTO `groups` 
+            ( `playername`,  `guid`,  `group`,  `set_by`) VALUES 
+            ( :playername,   :guid,   :group,   :set_by);
+         ]]
+        }
+      )
     end
   end,
   
-  SetGroup = function(player, group, issuer)
-    if SGRP.db == nil then return end 
-    
-    sqlutil.runner(SGRP.db, {
-        playername = player.name, 
-        guid = player:getguid(), 
-        group = group, 
-        set_by = issuer.name
-      },
-      {[[
-          /* update if exists */
-          UPDATE `groups` SET `group` = :group WHERE `guid` = :guid;
-       ]],[[
-          /* guid is unique */
-          INSERT OR IGNORE INTO `groups` 
-          ( `playername`,  `guid`,  `group`,  `set_by`) VALUES 
-          (:playername, :guid, :group, :set_by);
-       ]]
-      }
-    )
-  end,
-  
   GetGroup = function(player)
-    if SGRP.db == nil then return end
-    
     local result = nil
-    local stmt = SGRP.db:prepare([=[
+    local stmt = SMAN.db:prepare([=[
       SELECT `group` FROM `groups` WHERE `guid` = ?
     ]=])
     stmt:bind(1, player:getguid())
     if stmt:step() == 100 then
-      return stmt:get_values()[1]
+      result = stmt:get_values()[1]
     end
     stmt:finalize()
     
@@ -152,7 +213,6 @@ SGRP = {
   end,
   
   Count = function()
-    if SGRP.db == nil then return end
     local result = nil
     local sql=[=[
       SELECT COUNT(*) FROM `groups`;
@@ -161,11 +221,8 @@ SGRP = {
       result = values[1]
       return 0
     end
-    SGRP.db:exec(sql,showrow)
+    SMAN.db:exec(sql,showrow)
     
     return tonumber(result)
   end
 }
-
-SLOG.init()
-SGRP.init()

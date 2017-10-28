@@ -8,9 +8,10 @@
 ![](https://raw.githubusercontent.com/FredericaBernkastel/PlutoAdmin/master/doc/deuterium-logo-b.jpg)
 
 #### `Stage: Commands`
-#### `Overrall progress: 6.63% done`
+#### `Overrall progress: 10.74% done`
 
 ```
+Commands................................ work (15)
 Groups.................................. done
 SQLite Database......................... done
 Command processing...................... done

@@ -1,16 +1,14 @@
-local LIP = require(LibPath .. "LIP")
-local inspect = require(LibPath .. "inspect")
-
 Group = {
-  permissions,
-  group_name,
-  login_password,
-  prefix,
-  CanDo
+
+--[[table<string>]]  permissions,
+--[[string]]         group_name,
+--[[string]]         login_password,
+--[[string]]         prefix,
+--[[func]]           CanDo
+
 }
 
 function Group:new(name, password, perms, prefix)
-  if sh_name == nil then sh_name = "" end
   if password == nil then password = "" end
   if perms == nil then perms = "" end
   if prefix == nil then prefix = "" end
@@ -21,10 +19,10 @@ function Group:new(name, password, perms, prefix)
   group.group_name = name:lower()
   group.login_password = password
   group.prefix = prefix
-  group.permissions = perms:split(",")
+  group.permissions = perms:Split(",")
   
   group.CanDo = function(permission)
-    if Utilities.HasValue(group.permissions, permission) or Utilities.HasValue(group.permissions, "*all*") then
+    if table.HasValue(group.permissions, permission) or table.HasValue(group.permissions, "*all*") then
       return true
     end
     return false
@@ -37,32 +35,31 @@ GroupsDatabase = {
   Groups = {},
   
   init = function()
-    print(ConfigValues.ConfigPath)
     if not (Utilities.IO.file_exists(ConfigValues.ConfigPath .. "groups.ini")) then
       LIP.save(ConfigValues.ConfigPath .. "groups.ini", ordered_table.new{
         "default", {
           pass = "",
-          permissions = "ping,rules,iamgod,version,pm",
+          permissions = "ping,rules,iamgod,version,pm,admins",
           prefix = ""
         },
         "friend", {
           pass = "",
-          permissions = "res,map",
+          permissions = "res,map,kick,warn,unwarn",
           prefix = "^0[^6Friend^0]^7"
         },        
         "moderator", {
           pass = "",
-          permissions = "res,map",
+          permissions = "res,map,status,kick,warn,unwarn",
           prefix = "^0[^1M^0]^7"
         },
         "admin", {
           pass = "",
-          permissions = "say,res,map",
+          permissions = "say,res,map,status,kick,warn,unwarn,warns",
           prefix = "^0[^3A^0]^7"
         }, 
         "leader", {
           pass = "",
-          permissions = "say,res,map",
+          permissions = "say,res,map,status,kick,warn,unwarn,warns,setgroup",
           prefix = "^0[^:Leader^0]^7"
         },         
         "owner", {
@@ -95,11 +92,11 @@ GroupsDatabase = {
     return GroupsDatabase.GetGroup((group == nil) and "default" or group)
   end,
   
-  GetEntityPermission = function(player, group, permission_string)
-    if Utilities.HasValue(GroupsDatabase.GetGroup("default").permissions, permission_string) then
+  GetEntityPermission = function(player, group, permission)
+    if table.HasValue(GroupsDatabase.GetGroup("default").permissions, permission) then 
       return true
     end
-    return group.CanDo(permission_string)
+    return group.CanDo(permission)
   end,
   
   FindEntryFromPlayers = function(GUID)
@@ -109,7 +106,43 @@ GroupsDatabase = {
       end
     end
     return nil
+  end,
+  
+  GetAdminsString = function(players)
+    local result = {}
+    for i, player in pairs(players) do
+      local grp = player:GetGroup()
+      if not Utilities.String.IsNullOrWhiteSpace(grp.prefix) then
+        result[#result + 1] = Command.GetString("admins", "formatting"):gsubMul{
+          ["<name>"] = player.name,
+          ["<formattedname>"] = player:GetFormattedName(),
+          ["<rankname>"] = grp.group_name,
+          ["<shortrank>"] = grp.prefix
+        }
+      end
+    end
+    return result
   end
 }
 
-GroupsDatabase.init()
+function Player:GetGroup()
+  return GroupsDatabase.GetPlayerGroup(self)
+end
+
+function Player:SetGroup(group_name, issuer)
+  SGRP.SetGroup(self, group_name, issuer)
+end
+
+function Player:GetFormattedName()
+  local grp = self:GetGroup()
+  if not Utilities.String.IsNullOrWhiteSpace(grp.prefix) then
+    return Lang_GetString("FormattedNameRank"):gsubMul{
+      ["<shortrank>"] = grp.prefix,
+      ["<rankname>"] = grp.group_name,
+      ["<name>"] = self.name
+    }
+  end
+  return Lang_GetString("FormattedNameRankless"):gsubMul{
+    ["<name>"] = self.name
+  }
+end
