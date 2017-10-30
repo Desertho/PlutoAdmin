@@ -38,32 +38,26 @@ GroupsDatabase = {
     if not (Utilities.IO.file_exists(ConfigValues.ConfigPath .. "groups.ini")) then
       LIP.save(ConfigValues.ConfigPath .. "groups.ini", ordered_table.new{
         "default", {
-          pass = "",
-          permissions = "ping,rules,iamgod,version,pm,admins",
+          permissions = "ping,rules,iamgod,version,pm,admins,guid,rules,apply,suicide,afk,help",
           prefix = ""
         },
         "friend", {
-          pass = "",
-          permissions = "res,map,kick,warn,unwarn",
+          permissions = "res,map,mode,gametype,kick,warn,unwarn",
           prefix = "^0[^6Friend^0]^7"
         },        
         "moderator", {
-          pass = "",
-          permissions = "res,map,status,kick,warn,unwarn",
+          permissions = "res,map,mode,gametype,kick,warn,unwarn,status,balance,changeteam,setteam,setafk",
           prefix = "^0[^1M^0]^7"
         },
         "admin", {
-          pass = "",
-          permissions = "say,res,map,status,kick,warn,unwarn,warns",
+          permissions = "res,map,mode,gametype,kick,warn,unwarn,status,balance,changeteam,setteam,setafk,warns,say,sayto,kill",
           prefix = "^0[^3A^0]^7"
         }, 
         "leader", {
-          pass = "",
-          permissions = "say,res,map,status,kick,warn,unwarn,warns,setgroup",
+          permissions = "res,map,mode,gametype,kick,warn,unwarn,status,balance,changeteam,setteam,setafk,warns,say,sayto,kill,setgroup",
           prefix = "^0[^:Leader^0]^7"
         },         
         "owner", {
-          pass = "",
           permissions = "*all*",
           prefix = "^0[^5Owner^0]^7"
         }
@@ -72,7 +66,7 @@ GroupsDatabase = {
     
     local ini_table = LIP.load(ConfigValues.ConfigPath .. "groups.ini")
     for group, data in pairs(ini_table) do
-      local _group = Group:new(group:lower(), data.pass, data.permissions, data.prefix)
+      local _group = Group:new(group:lower(), nil, data.permissions, data.prefix)
       GroupsDatabase.Groups[#GroupsDatabase.Groups + 1] = _group
     end
     
@@ -131,6 +125,18 @@ end
 
 function Player:SetGroup(group_name, issuer)
   SGRP.SetGroup(self, group_name, issuer)
+end
+
+function Player:GetAllPermissions()
+  local result = {}
+  local grp = GroupsDatabase.GetPlayerGroup(self)
+  for i, cmd in ipairs(CommandList.commands) do
+    if GroupsDatabase.GetEntityPermission(self, grp, cmd.name) then
+      result[#result + 1] = cmd.name
+    end
+  end
+  
+  return result
 end
 
 function Player:GetFormattedName()

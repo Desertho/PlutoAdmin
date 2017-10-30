@@ -21,6 +21,8 @@ Command = {
               end
 }
 
+local MapRotation = ""
+
 function Command:new(commandname, paramcount, commandbehavior, actiontobedone)
   local command = {}
   self.__index = self
@@ -145,7 +147,20 @@ end
 -- say <message>
 CommandList.Add(Command:new("say", 0, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
   function(sender, arguments, optarg)
-    WriteChatToAll(optarg:RemoveColors())
+    WriteChatToAll(optarg)
+  end
+))
+
+-- sayto <player>, <message>
+CommandList.Add(Command:new("sayto", 1, Command.Behavior.HasOptionalArguments | Command.Behavior.OptionalIsRequired, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    target:WriteChat(optarg)
   end
 ))
 
@@ -153,22 +168,6 @@ CommandList.Add(Command:new("say", 0, Command.Behavior.HasOptionalArguments | Co
 CommandList.Add(Command:new("ping", 0, Command.Behavior.Normal, 
   function(sender, arguments, optarg)
     sender:WriteChat("^1pong, sucker!")
-  end
-))  
-
--- rules
-CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal, 
-  function(sender, arguments, optarg)
-    sender:WriteChatMultiline({
-      "^:Snek iSnipe Rules^0:",
-      "^1Don't ^7HardScope^0.",
-      "^1Don't ^7HalfScope^0.",
-      "^1Don't ^7NoScope^0.",
-      "^1Don't ^7DropShot^0.",
-      "^1Don't ^7Camp^0/^7Wait^0.",
-      "^1Don't ^7HeadGlitch^0.",
-      "^2Respect Admins^0."
-    }, 1000)
   end
 ))
 
@@ -446,7 +445,7 @@ CommandList.Add(Command:new("setgroup", 2, Command.Behavior.Normal,
       return false
     end
     
-    sender:SetGroup(group.group_name, sender)
+    target:SetGroup(group.group_name, sender)
     
     WriteChatToAll(Command.GetString("setgroup", "message"):gsubMul{
       ["<target>"] = target.name,
@@ -458,9 +457,289 @@ CommandList.Add(Command:new("setgroup", 2, Command.Behavior.Normal,
   end
 ))
 
+-- mode <DSR>
+CommandList.Add(Command:new("mode", 1, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    if not(Utilities.IO.file_exists("admin\\" .. arguments[1] .. ".dsr") or 
+           Utilities.IO.file_exists("players2\\" .. arguments[1] .. ".dsr")) then
+      sender:WriteChat(Command.GetMessage("DSRNotFound"))
+      return false
+    end
+    
+    local argv = {sender.name, sender:GetFormattedName()}
+    local announcer = function() 
+      WriteChatToAll(Command.GetString("mode", "message"):gsubMul{
+        ["<issuer>"] = argv[1],
+        ["<issuerf>"] = argv[2],
+        ["<dsr>"] = arguments[1]
+      })
+    end
+    CMD_mode(arguments[1], nil, announcer)
+  end
+))
+
+-- gametype <DSR> <mapname>
+CommandList.Add(Command:new("gametype", 2, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    if not(Utilities.IO.file_exists("admin\\" .. arguments[1] .. ".dsr") or 
+           Utilities.IO.file_exists("players2\\" .. arguments[1] .. ".dsr")) then
+      sender:WriteChat(Command.GetMessage("DSRNotFound"))
+      return false
+    end
+    
+    local map = FindSingleMap(arguments[2])
+    if map == nil then
+      sender:WriteChat(Command.GetMessage("NotOneMapFound"))
+      return false
+    end
+    
+    local argv = {sender.name, sender:GetFormattedName()}
+    local announcer = function() 
+      WriteChatToAll(Command.GetString("gametype", "message"):gsubMul{
+        ["<issuer>"] = argv[1],
+        ["<issuerf>"] = argv[2],
+        ["<dsr>"] = arguments[1],
+        ["<mapname>"] = arguments[2]
+      })
+    end
+    
+    CMD_mode(arguments[1], map, announcer)
+  end
+))
+
+-- guid
+CommandList.Add(Command:new("guid", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    sender:WriteChat(Command.GetString("guid", "message"):gsubMul{
+      ["<guid>"] = sender:getguid()
+    })
+  end
+))
+
+-- rules
+CommandList.Add(Command:new("rules", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local lines = Utilities.FilterComments(Utilities.IO.ReadAllLines(ConfigValues.ConfigPath .. "\\Commands\\rules.txt"))
+    if #lines == 0 then
+      sender:WriteChat(Command.GetMessage("CmdDisabled"))
+    else
+      sender:WriteChatMultiline(lines, 1000)
+    end
+  end
+))
+
+-- apply
+CommandList.Add(Command:new("apply", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local lines = Utilities.FilterComments(Utilities.IO.ReadAllLines(ConfigValues.ConfigPath .. "\\Commands\\apply.txt"))
+    if #lines == 0 then
+      sender:WriteChat(Command.GetMessage("CmdDisabled"))
+    else
+      sender:WriteChatMultiline(lines, 1000)
+    end
+  end
+))
+
+-- balance
+CommandList.Add(Command:new("balance", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local axis = {}
+    local allies = {}
+    for player in util.iterPlayers() do
+      if player:GetTeam() == "axis" then
+        axis[#axis + 1] = player
+      elseif player:GetTeam() == "allies" then
+        allies[#allies + 1] = player
+      end
+    end
+    
+    if math.abs(#axis - #allies) < 2 then
+      sender:WriteChat(Command.GetString("balance", "teamsalreadybalanced"))
+      return false
+    end
+    
+    table.sort(axis, function(a,b) return gsc.isalive(a) and not gsc.isalive(b) end)
+    table.sort(allies, function(a,b) return gsc.isalive(a) and not gsc.isalive(b) end)
+    
+    while #axis > #allies and math.abs(#axis - #allies) > 1 do
+      local chosenplayer = axis[#axis]
+      CMD_changeteam(chosenplayer, "allies")
+      table.remove(axis)
+      allies[#allies + 1] = chosenplayer
+    end
+    
+    while #allies > #axis and math.abs(#axis - #allies) > 1 do
+      local chosenplayer = allies[#allies]
+      CMD_changeteam(chosenplayer, "axis")
+      table.remove(allies)
+      axis[#axis + 1] = chosenplayer
+    end  
+
+    WriteChatToAll(Command.GetString("balance", "message"):gsubMul{
+      ["<issuer>"] = sender.name,
+      ["<issuerf>"] = sender:GetFormattedName()
+    })
+  end
+))
+
+-- suicide
+CommandList.Add(Command:new("suicide", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    AfterDelay(100, function() sender:suicide() end)
+  end
+))
+
+-- changeteam <player>
+CommandList.Add(Command:new("changeteam", 1, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    if target:IsSpectating() then
+      sender:WriteChat(Command.GetMessage("PlayerIsSpectating"))
+      return false
+    end
+    
+    if target:GetTeam() == "axis" or target:GetTeam() == "allies" then
+      CMD_changeteam(target, (target:GetTeam() == "allies") and "axis" or "allies")
+    end
+    
+    WriteChatToAll(Command.GetString("setteam", "message"):gsubMul{
+      ["<target>"] = target.name,
+      ["<targetf>"] = target:GetFormattedName(),
+      ["<issuer>"] = sender.name,
+      ["<issuerf>"] = sender:GetFormattedName()
+    })
+  end
+))
+
+-- setteam <player> <axis/allies/spectator>
+CommandList.Add(Command:new("setteam", 2, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    if not table.HasValue(Data.TeamNames, arguments[2]) then
+      sender:WriteChat(Command.GetMessage("InvalidTeamName"))
+      return false
+    end
+    
+    if target:GetTeam() == arguments[2] then
+      sender:WriteChat(Command.GetString("setteam", "error"))
+      return false
+    end
+    
+    CMD_changeteam(target, arguments[2])
+    
+    WriteChatToAll(Command.GetString("setteam", "message"):gsubMul{
+      ["<target>"] = target.name,
+      ["<targetf>"] = target:GetFormattedName(),
+      ["<issuer>"] = sender.name,
+      ["<issuerf>"] = sender:GetFormattedName()
+    })    
+  end
+))
+
+-- setafk <player>
+CommandList.Add(Command:new("setafk", 1, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    if target:IsSpectating() then
+      sender:WriteChat(Command.GetString("setteam", "error"))
+      return false
+    end
+    
+    CMD_changeteam(target, "spectator")
+  end
+))
+
+-- afk
+CommandList.Add(Command:new("afk", 0, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    CMD_changeteam(sender, "spectator")
+  end
+))
+
+-- help [command]
+CommandList.Add(Command:new("help", 0, Command.Behavior.HasOptionalArguments, 
+  function(sender, arguments, optarg)
+    if not Utilities.String.IsNullOrEmpty(optarg) then
+      if DefaultCmdLang[("command_%s_usage"):format(optarg)] ~= nil then
+        sender:WriteChat(Command.GetString(optarg, "usage"))
+      else
+        sender:WriteChat(Command.GetMessage("CommandNotFound"))
+      end
+      
+      return
+    end
+    
+    sender:WriteChat(Command.GetString("help", "firstline"))
+    sender:WriteChatMultiline(table.Condense(sender:GetAllPermissions()), 2000)
+  end
+))
+
+-- kill
+CommandList.Add(Command:new("kill", 1, Command.Behavior.Normal, 
+  function(sender, arguments, optarg)
+    local target = FindSinglePlayer(arguments[1])
+    if target == nil then
+      sender:WriteChat(Command.GetMessage("NotOnePlayerFound"))
+      return false
+    end
+    
+    AfterDelay(100, function() target:suicide() end)
+  end
+))
+
 function CMD_kick(target, reason)
   if Utilities.String.IsNullOrEmpty(reason) then reason = "You have been kicked" end
   AfterDelay(200, function() 
     util.executeCommand("dropclient " .. target:getentitynumber() .. " \"" .. reason .. "\"")
+  end)
+end
+
+function CMD_mode(dsrname, map, announcer)
+  if Utilities.String.IsNullOrWhiteSpace(map) then
+    map = Utilities.GetDvar("mapname")
+  end
+  
+  if not Utilities.String.IsNullOrWhiteSpace(MapRotation) then
+    print("ERROR: Modechange already in progress")
+    return
+  end
+  
+  MapRotation = Utilities.GetDvar("sv_maprotation")
+  local fileName = "players2\\TEMP.dspl"
+  local file = assert(io.open(fileName, 'w+b'), 'Error writing to file: ' .. fileName)
+  file:write(("%s,%s,1\n"):format(map, dsrname))
+  file:close()
+  Utilities.SetDvar("sv_maprotation", "TEMP")
+  AfterDelay(100, function() 
+    util.executeCommand("map_rotate")
+  end)
+  AfterDelay(200, function()
+    Utilities.SetDvar("sv_maprotation", MapRotation)
+    MapRotation = ""
+    if announcer ~= nil then
+      announcer()
+    end
+  end)
+end
+
+function CMD_changeteam(player, team)
+  AfterDelay(100, function() 
+    player.sessionteam = team
+    util.notifyObject(player, "menuresponse", "team_marinesopfor", team)
   end)
 end

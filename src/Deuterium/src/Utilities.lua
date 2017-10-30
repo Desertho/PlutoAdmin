@@ -22,6 +22,26 @@ Utilities = {
     file_exists = function(path)
        local f = io.open(path,"r")
        if f ~= nil then io.close(f) return true else return false end
+    end,
+    
+    path_exists = function (path)
+      local ok, err, code = os.rename(path, path)
+      if not ok then
+        if code == 13 then
+          -- Permission denied, but it exists
+          return true
+        end
+      end
+      return ok, err
+    end,  
+    
+    ReadAllLines = function(file)
+      if not Utilities.IO.file_exists(file) then return {} end
+      local lines = {}
+      for line in io.lines(file) do 
+        lines[#lines + 1] = line
+      end
+      return lines
     end
   },
   
@@ -32,7 +52,27 @@ Utilities = {
     end
     return false
   end,
-
+  
+  GetDvar = function(key)
+    return gsc.getdvar(key)
+  end,
+  
+  SetDvar = function(key, value)
+    gsc.setdvar(key, value)
+  end,
+  
+  FilterComments = function(lines)
+    local result = {}
+    if lines == nil then return result end
+    
+    for i,v in ipairs(lines) do
+      if v:sub(1,2) ~= "//" then
+        result[#result + 1] = v
+      end
+    end
+    return result
+  end,
+  
   DefaultError = function(E)
     return  E:gsub("%.%.%..-scripts", "" )
   end
@@ -40,7 +80,7 @@ Utilities = {
 
 function AfterDelay(delay, func)
   assert(type(func) == "function", "Not a function \n" .. debug.traceback())
-  callbacks.onInterval.add(delay, func)
+  callbacks.afterDelay.add(delay, func)
 end
 
 function string:Literalize()
@@ -102,6 +142,15 @@ function table.HasValue(self, value)
   return false
 end
 
+function table.Union(self, _table)
+  for i, v in ipairs(_table) do
+    if not table.HasValue(self, v) then
+      table.insert(self, v)
+    end
+  end
+  return self
+end
+
 function table.FromIterator(...)
   local arr = {}
   for v in ... do
@@ -157,6 +206,14 @@ end
 function Player:WriteChatCondensed(messages, delay, condenselevel, separator)
   if delay == nil then delay = 1000 end
   self:WriteChatMultiline(table.Condense(messages, condenselevel, separator), delay)
+end
+
+function Player:GetTeam()
+  return self.sessionteam
+end
+
+function Player:IsSpectating()
+  return self.sessionteam == "spectator"
 end
 
 function ChangeMap(devmapname)
